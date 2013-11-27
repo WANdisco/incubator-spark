@@ -114,6 +114,7 @@ class HadoopRDD[K, V](
       } catch {
         case e: Exception => logWarning("Exception in RecordReader.close()", e)
       }
+      confBroadcast.cleanBroadcast(confBroadcast.id)
     }
   }
 

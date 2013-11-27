@@ -24,11 +24,16 @@ import org.apache.spark._
 
 abstract class Broadcast[T](private[spark] val id: Long) extends Serializable {
   def value: T
-
+  
+  def iid = id
   // We cannot have an abstract readObject here due to some weird issues with
   // readObject having to be 'private' in sub-classes.
 
   override def toString = "Broadcast(" + id + ")"
+  
+  def cleanBroadcast(id:Long) {
+    // Do nothing for now?
+  }
 }
 
 private[spark] 
@@ -65,6 +70,6 @@ class BroadcastManager(val _isDriver: Boolean) extends Logging with Serializable
 
   def newBroadcast[T](value_ : T, isLocal: Boolean) =
     broadcastFactory.newBroadcast[T](value_, isLocal, nextBroadcastId.getAndIncrement())
-
+    
   def isDriver = _isDriver
 }

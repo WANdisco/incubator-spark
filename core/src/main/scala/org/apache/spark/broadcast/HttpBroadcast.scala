@@ -35,13 +35,19 @@ private[spark] class HttpBroadcast[T](@transient var value_ : T, isLocal: Boolea
   def value = value_
 
   def blockId: String = "broadcast_" + id
-
+  
+  override def iid = id
+  
   HttpBroadcast.synchronized {
     SparkEnv.get.blockManager.putSingle(blockId, value_, StorageLevel.MEMORY_AND_DISK, false)
   }
 
-  if (!isLocal) { 
+  if (!isLocal) {
     HttpBroadcast.write(id, value_)
+  }
+  
+  override def cleanBroadcast(id:Long) {
+    HttpBroadcast.cleanId(id)
   }
 
   // Called by JVM when deserializing an object
@@ -51,7 +57,7 @@ private[spark] class HttpBroadcast[T](@transient var value_ : T, isLocal: Boolea
       SparkEnv.get.blockManager.getSingle(blockId) match {
         case Some(x) => value_ = x.asInstanceOf[T]
         case None => {
-          logInfo("Started reading broadcast variable " + id)
+          logInfo("Started reading broadcast variable " + id)         
           val start = System.nanoTime
           value_ = HttpBroadcast.read[T](id)
           SparkEnv.get.blockManager.putSingle(blockId, value_, StorageLevel.MEMORY_AND_DISK, false)
@@ -151,13 +157,27 @@ private object HttpBroadcast extends Logging {
     serIn.close()
     obj
   }
+  
+  def cleanId(id: Long) {
+	try {
+	  new File(broadcastDir, "broadcast-" + id).delete();
+	  logInfo("Deleted broadcast file 'broadcast-" + id + "'")
+	} catch {
+	  case e: Exception => logWarning("Could not delete broadcast file 'broadcast-" + id + "'", e)
+	}
+
+  }
+  
 
   def cleanup(cleanupTime: Long) {
     val iterator = files.internalMap.entrySet().iterator()
+    // FIXME: Besides the simple refcounting do the sanity check and for now just  
+    // increase the cleanupTime if it's too small. 
+    val c_time = if(cleanupTime < 43200) 43200 else cleanupTime
     while(iterator.hasNext) {
       val entry = iterator.next()
       val (file, time) = (entry.getKey, entry.getValue)
-      if (time < cleanupTime) {
+      if (time < c_time) {
         try {
           iterator.remove()
           new File(file.toString).delete()

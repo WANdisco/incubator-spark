@@ -109,10 +109,11 @@ class NewHadoopRDD[K, V](
 
     private def close() {
       try {
-        reader.close()
+        reader.close()        
       } catch {
         case e: Exception => logWarning("Exception in RecordReader.close()", e)
       }
+      confBroadcast.cleanBroadcast(confBroadcast.id)
     }
   }
 
